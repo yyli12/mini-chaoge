@@ -1,6 +1,6 @@
 <?php
 
-require_once('Kijiji.php');
+require_once('data.php');
 
 print "<p><a href=index.php>回主页</a></p>";
 

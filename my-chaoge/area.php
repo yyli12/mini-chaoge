@@ -1,6 +1,6 @@
 <?php
 
-require_once('Kijiji.php');
+require_once('data.php');
 
 $id = @$_GET['id'];
 $c = new Area();
