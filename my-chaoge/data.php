@@ -1,15 +1,9 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: yyli
- * Date: 2015/7/20
- * Time: 14:25
- */
+class DataConnection {
 
-class DB_conn {
     private static $conn = null;
-    public static function getConn() {
-        if( self::$conn == NULL ) {
+    public static function getConnection() {
+        if (self::$conn == null) {
             self::$conn = new PDO("mysql:host=localhost;dbname=chaoge","root","");
             self::$conn->query('set names utf8');
         }
@@ -17,85 +11,122 @@ class DB_conn {
     }
 }
 
-class Data {
-    public $key, $table, $col;
 
-    public function init($opt) {
-        $this->key = $opt['key'];
-        $this->table = $opt['table'];
-        $this->col = $opt['col'];
+function debug($a) {
+//    echo "<br>----------<br>";
+//    print_r($a);
+}
+
+
+class Data {
+    public $key, $table, $columns;
+
+    public function init($options) {
+        $this->key = $options['key'];
+        $this->table = $options['table'];
+        $this->columns = $options['columns'];
     }
 
     public function reset() {
-        foreach($this->col as $objCol => $dbCol) {
-            $this->$objCol = NULL;
+        foreach ($this->columns as $objCol => $dbCol) {
+            $this->$objCol = null;
         }
+//        print_r($this);
     }
 
-    public function load($id = NULL) {
+    public function load($id = null) {
         $key = $this->key;
-        if($id == NULL) {
-            $id = $this->key;
+        if ($id == null) {
+            $id = $this->$key;
         }
-
-        $conn = DB_conn::getConn();
-        $sql = "select * from {$this->table} where {$this->col[$key]} = ?";
+// origin mysql version
+//		$sql = "select * from {$this->table} where {$this->columns[$key]} = $id";
+//		DataConnection::getConnection();
+//		$rs = mysql_query($sql) or die(mysql_error());
+//		$row = mysql_fetch_assoc($rs);
+//		if ($row) {
+//			foreach ($this->columns as $objCol => $dbCol) {
+//				$this->$objCol = $row["$dbCol"];
+//			}
+//			return $this;
+//		} else {
+//			return null;
+//		}
+        $conn = DataConnection::getConnection();
+        $sql = "select * from {$this->table} where {$this->columns[$key]} = ?";
         $sth = $conn->prepare($sql);
-        $sth->execute();
+        $sth->execute(array($id));
         $row = $sth->fetch();
-        if($row) {
-            foreach($this->col as $objCol => $dbCol) {
-                $this->$objCol = $row[$dbCol];
+        if ($row) {
+            // print_r($row);
+            foreach ($this->columns as $objCol => $dbCol) {
+                $this->$objCol = $row["$dbCol"];
             }
             return $this;
-        }
-        else {
-            return NULL;
+        } else {
+            return null;
         }
     }
 
     public function find() {
         $result = array();
-        $cond = "where 1 = 1 ";
-        foreach($this->col as $objCol => $dbCol) {
-            if(isset($this->objCol)) {
-                $cond .= " and $dbCol = {$this->objCol} ";
+        $where = 'where 1=1 ';
+//        debug($this);
+        foreach ($this->columns as $objCol => $dbCol) {
+            // if there is restriction in objCol, add to WHERE cond
+//             echo $this->$objCol;
+            if (isset($this->$objCol)) {
+                $where .= " and $dbCol = {$this->$objCol}";
             }
         }
-        $conn = DB_conn::getConn();
-        $sql = "select * from $this->table $cond";
+        // debug($this);
+        $conn = DataConnection::getConnection();
+        $sql = "select * from $this->table $where";
+//        echo $sql;
         $sth = $conn->prepare($sql);
-        $sth->execute();
+        $sth->execute(array());
         $row = $sth->fetch();
-        while($row) {
+        while ($row) {
             $o = clone $this;
-            foreach($o->col as $objCol => $dbCol) {
+            foreach ($o->columns as $objCol => $dbCol) {
                 $o->$objCol = $row[$dbCol];
             }
             $result[] = $o;
             $row = $sth->fetch();
         }
+// origin mysql version
+//		$sql = "select * from {$this->table} $where";
+//		DataConnection::getConnection();
+//		$rs = mysql_query($sql) or die(mysql_error());
+//		$row = mysql_fetch_assoc($rs);
+//		while ($row) {
+//			$o = clone $this;
+//			foreach ($o->columns as $objCol => $dbCol) {
+//				$o->$objCol = $row[$dbCol];
+//			}
+//			$result[] = $o;
+//			$row = mysql_fetch_assoc($rs);
+//		}
 
+//		print_r($result);
         return $result;
     }
-
-
 }
 
 class Tree extends Data {
     public $pkey;
 
-    public function init($opt)
-    {
-        parent::init($opt);
-        $this->pkey = $opt['pkey'];
+    public function init($options) {
+        parent::init($options);
+        $this->pkey = $options['pkey'];
     }
 
     public function parent() {
         $o = clone $this;
         $o->reset();
+        debug($this->pkey);
         $o->{$o->key} = $this->{$this->pkey};
-        return $o->load;
+        return $o->load();
     }
 
     public function children() {
@@ -110,28 +141,24 @@ class Tree extends Data {
         do {
             $result[] = $o;
             $o = $o->parent();
-        } while($o);
+        } while ($o);
         return array_reverse($result);
-
     }
-
-
-
 }
 
-class Category extends Tree{
+class Category extends Tree {
     public function __construct() {
-        $opt = array(
+        $options = array(
             'key' => 'id',
             'pkey' => 'pid',
             'table' => 'babel_node',
-            'col' => array(
+            'columns' => array(
                 'id' => 'node_id',
                 'pid' => 'nod_pid',
                 'name' => 'nod_title'
             )
         );
-        parent::init($opt);
+        parent::init($options);
     }
 
     public function ads() {
@@ -139,7 +166,6 @@ class Category extends Tree{
         $a->categoryId = $this->id;
         return $a->find();
     }
-
 }
 
 class Area extends Tree {
@@ -148,7 +174,7 @@ class Area extends Tree {
             'key' => 'id',
             'pkey' => 'pid',
             'table' => 'babel_area',
-            'col' => array(
+            'columns' => array(
                 'id' => 'area_id',
                 'pid' => 'area_pid',
                 'name' => 'area_title'
@@ -162,14 +188,13 @@ class Area extends Tree {
         $a->areaId = $this->id;
         return $a->find();
     }
-
 }
 
 class Ad extends Data {
     public $user, $area, $category;
 
-    public function  __construct() {
-        $opt = array(
+    public function __construct() {
+        $options = array(
             'key' => 'id',
             'table' => 'babel_topic',
             'columns' => array(
@@ -181,24 +206,28 @@ class Ad extends Data {
                 'content' => 'tpc_content'
             )
         );
-        parent::init($opt);
+        parent::init($options);
     }
 
-    public function load($id = NULL) {
+    public function load($id = null) {
+//        debug($this);
         parent::load($id);
+//        debug($this);
         $this->category = new Category();
         $this->category->id = $this->categoryId;
         $this->area = new Area();
         $this->area->id = $this->areaId;
+//        debug($this->area->load());
         $this->user = new User();
         $this->user->id = $this->userId;
     }
 
     public function comments() {
-        $c = new Comment();
-        $c->adId = $this->id;
-        return $c->find();
+        $a = new Comment();
+        $a->adId = $this->id;
+        return $a->find();
     }
+
 }
 
 class User extends Data {
@@ -206,7 +235,7 @@ class User extends Data {
         $options = array(
             'key' => 'id',
             'table' => 'babel_user',
-            'col' => array(
+            'columns' => array(
                 'id' => 'usr_id',
                 'email' => 'usr_email',
                 'name' => 'usr_nick'
@@ -238,9 +267,5 @@ class Comment extends Data {
         parent::init($options);
     }
 }
-
-
-
-
 
 ?>

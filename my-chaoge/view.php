@@ -14,11 +14,7 @@ foreach ($c->category->load()->toRoot() as $cc) {
 }
 
 print "<p>";
-print 1;
-print_r($c->area);
-print 2;
-print_r($c->area->load());
-print 3;
+
 foreach ($c->area->load()->toRoot() as $cc) {
 	print "<a href=area.php?id={$cc->id}>{$cc->name}</a>|";
 }
